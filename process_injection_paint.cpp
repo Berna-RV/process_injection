@@ -79,12 +79,7 @@ string exec(string command) {
    return result;
 }
 
-int main(int argc, char* argv[]){
-    
-    // if(argc < 2){
-    //     printf("%s usage: program.exe <PID>", e);
-    //     return EXIT_FAILURE;
-    // }
+int main(){
 
     // start a process with mspaint.exe
     STARTUPINFOA si;
